@@ -821,10 +821,8 @@ async function loadGrid() {
 
 // ... more UI logic to follow ...
 
-document.addEventListener('DOMContentLoaded', async () => {
-    await initAuth();
-    loadGrid();
-});
+await initAuth();
+loadGrid();
 
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
