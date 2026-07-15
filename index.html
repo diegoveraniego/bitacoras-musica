@@ -709,128 +709,6 @@
     </div>
 
 <script type="module">
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-
-const SUPABASE_URL = 'https://whayrbaipmclbcmjibga.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_oKAxxffn1K64_wXH9r2NKg_Zhvkxs_w';
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
-
-window.supabase = supabase; // Make it global for debugging if needed
-
-// App state
-let currentUser = null;
-let currentDetailSongId = null;
-let editingSongId = null;
-
-// Auth Initialization
-async function initAuth() {
-    const { data: { session }, error } = await supabase.auth.getSession();
-    currentUser = session?.user || null;
-    
-    supabase.auth.onAuthStateChange((_event, session) => {
-        currentUser = session?.user || null;
-        renderAuthUI();
-        loadGrid(); // Reload grid based on auth state (pendientes)
-    });
-    
-    renderAuthUI();
-}
-
-function renderAuthUI() {
-    const authControls = document.getElementById('auth-controls');
-    const btnAdmin = document.getElementById('btn-admin');
-    const btnNueva = document.getElementById('btn-nueva');
-    
-    if (currentUser) {
-        authControls.innerHTML = `
-            <span style="font-size: 0.9rem; color: var(--text-muted);">${currentUser.email}</span>
-            <button class="button" id="btn-logout">Cerrar Sesión</button>
-        `;
-        document.getElementById('btn-logout').addEventListener('click', () => supabase.auth.signOut());
-        btnAdmin.style.display = 'inline-flex';
-        btnNueva.style.display = 'inline-flex';
-    } else {
-        authControls.innerHTML = `
-            <input type="email" id="login-email" class="form-control" placeholder="tu@correo.com" style="width: 150px; padding: 0.2rem 0.5rem; min-height: 30px;">
-            <button class="button" id="btn-login" style="min-height: 30px;">Ingresar</button>
-        `;
-        document.getElementById('btn-login').addEventListener('click', async () => {
-            const email = document.getElementById('login-email').value;
-            if (!email) return alert('Ingresa tu correo');
-            const { error } = await supabase.auth.signInWithOtp({ email });
-            if (error) alert('Error: ' + error.message);
-            else alert('Revisa tu correo para acceder (Magic Link enviado)');
-        });
-        btnAdmin.style.display = 'none';
-        btnNueva.style.display = 'none'; // Only logged in users can add
-    }
-}
-
-// UI Loaders
-async function loadGrid() {
-    const loading = document.getElementById('loading');
-    const container = document.getElementById('grid-container');
-    loading.style.display = 'flex';
-    container.innerHTML = '';
-    
-    let query = supabase.from('canciones').select('id, titulo, portada_url, estado, cancion_artista(artista:artistas(nombre))');
-    
-    // If not logged in, only show approved
-    if (!currentUser) {
-        query = query.eq('estado', 'aprobado');
-    }
-    
-    const { data: canciones, error } = await query;
-    loading.style.display = 'none';
-    
-    if (error) {
-        console.error("Error loading grid", error);
-        container.innerHTML = '<p>Error al cargar canciones.</p>';
-        return;
-    }
-    
-    canciones.forEach(song => {
-        // Extract artists safely, Supabase returns nested objects in an array
-        let artistas = [];
-        if (song.cancion_artista) {
-            artistas = song.cancion_artista.map(ca => ca.artista.nombre).filter(n => n);
-        }
-        
-        const card = document.createElement('div');
-        card.className = 'card';
-        card.dataset.id = song.id;
-        
-        let imgHtml = '<div class="card-img-placeholder">🎵</div>';
-        if (song.portada_url) {
-            imgHtml = `<img src="${song.portada_url}" class="card-img" loading="lazy" alt="Portada de ${song.titulo}">`;
-        }
-        
-        let pendingBadge = '';
-        if (song.estado === 'pendiente') {
-            pendingBadge = '<div style="position:absolute; top:8px; right:8px; background:var(--accent-hover); color:white; font-size:0.75rem; padding:2px 6px; border-radius:4px;">Pendiente</div>';
-        }
-        
-        card.innerHTML = `
-            <div style="position:relative;">
-                ${imgHtml}
-                ${pendingBadge}
-            </div>
-            <div class="card-content">
-                <div class="card-title">${song.titulo}</div>
-                <div class="card-artist">${artistas.join(', ') || 'Artista Desconocido'}</div>
-            </div>
-        `;
-        
-        card.addEventListener('click', () => openDetailView(song.id));
-        container.appendChild(card);
-    });
-}
-
-// ... more UI logic to follow ...
-
-await initAuth();
-loadGrid();
-
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -1351,6 +1229,8 @@ document.getElementById('btn-save-cancion').addEventListener('click', async (e) 
 // To keep it simple, we don't prepopulate datalists on load here.
 
 
+await initAuth();
+loadGrid();
 </script>
 </body>
 </html>
