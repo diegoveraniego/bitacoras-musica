@@ -675,9 +675,32 @@
                     </div>
                 </form>
             </div>
-            <div class="modal-footer">
-                <button class="button" id="btn-cancel-modal">Cancelar</button>
-                <button class="button primary" id="btn-save-cancion">Guardar Canción</button>
+            <div class="modal-footer" style="justify-content: space-between;">
+                <div style="display:flex; gap:0.5rem; align-items:center;">
+                    <span id="historial-resumen" style="font-size:0.8rem; color:var(--text-muted);"></span>
+                    <button class="icon-button" id="btn-historial" title="Ver Historial" style="display:none; font-size:1.2rem;">
+                        🕒
+                    </button>
+                </div>
+                <div style="display:flex; gap:0.5rem;">
+                    <button class="button" id="btn-cancel-modal">Cancelar</button>
+                    <button class="button primary" id="btn-save-cancion">Guardar Canción</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: Historial -->
+    <div id="modal-historial" class="modal-overlay" style="z-index: 2000;">
+        <div class="modal-dialog" style="max-width: 500px;">
+            <div class="modal-header">
+                <h2>Historial de Cambios</h2>
+                <button class="icon-button" id="btn-close-historial">&times;</button>
+            </div>
+            <div class="modal-body" style="max-height: 400px; overflow-y: auto;">
+                <div id="historial-list" style="display:flex; flex-direction:column; gap:0.8rem;">
+                    <!-- JS injects here -->
+                </div>
             </div>
         </div>
     </div>
@@ -1023,6 +1046,8 @@ document.getElementById('btn-nueva').addEventListener('click', () => {
     document.getElementById('form-cancion').reset();
     document.querySelectorAll('.tag-container').forEach(c => c.innerHTML = '');
     document.getElementById('secciones-container').innerHTML = '';
+    document.getElementById('historial-resumen').innerText = '';
+    document.getElementById('btn-historial').style.display = 'none';
     document.getElementById('modal-cancion').style.display = 'flex';
 });
 
@@ -1077,6 +1102,26 @@ function openEditForm(song, artistas, generos, instrumentos, inspiraciones) {
     if(instrumentos) instrumentos.split(', ').forEach(t => t && addTagToUI('tags_instrumentos', t, 'f_instrumentos'));
     document.getElementById('tags_inspiraciones').innerHTML = '';
     if(inspiraciones) inspiraciones.split(', ').forEach(t => t && addTagToUI('tags_inspiraciones', t, 'f_inspiraciones'));
+
+    // Fetch history summary
+    document.getElementById('historial-resumen').innerText = 'Cargando historial...';
+    document.getElementById('btn-historial').style.display = 'none';
+    
+    supabase.from('historial_cambios')
+        .select('usuario, fecha')
+        .eq('cancion_id', song.id)
+        .order('fecha', { ascending: false })
+        .limit(1)
+        .then(({ data }) => {
+            if (data && data.length > 0) {
+                const date = new Date(data[0].fecha).toLocaleDateString();
+                document.getElementById('historial-resumen').innerText = `Última edición por ${data[0].usuario} el ${date}`;
+                document.getElementById('btn-historial').style.display = 'inline-flex';
+                document.getElementById('btn-historial').onclick = () => openHistorial(song.id);
+            } else {
+                document.getElementById('historial-resumen').innerText = 'Sin historial registrado.';
+            }
+        });
 
     // populate sections
     const cont = document.getElementById('secciones-container');
@@ -1230,9 +1275,50 @@ document.getElementById('btn-save-cancion').addEventListener('click', async (e) 
     if (secInserts.length > 0) {
         await supabase.from('secciones_tonales').insert(secInserts);
     }
+    
+    // Insert history
+    if (currentUser) {
+        await supabase.from('historial_cambios').insert({
+            cancion_id: savedSongId,
+            usuario: currentUser.email,
+            accion: editingSongId ? 'Editó la canción' : 'Creó la canción'
+        });
+    }
 
     document.getElementById('modal-cancion').style.display = 'none';
     loadGrid();
+});
+
+async function openHistorial(cancionId) {
+    document.getElementById('modal-historial').style.display = 'flex';
+    const list = document.getElementById('historial-list');
+    list.innerHTML = 'Cargando...';
+    
+    const { data, error } = await supabase.from('historial_cambios')
+        .select('usuario, fecha, accion')
+        .eq('cancion_id', cancionId)
+        .order('fecha', { ascending: false });
+        
+    if (error) {
+        list.innerHTML = 'Error al cargar historial';
+        return;
+    }
+    
+    if (!data || data.length === 0) {
+        list.innerHTML = 'No hay historial para esta canción.';
+        return;
+    }
+    
+    list.innerHTML = data.map(row => `
+        <div style="border-left: 2px solid var(--accent-color); padding-left: 0.5rem;">
+            <div style="font-size: 0.9rem;"><strong>${row.usuario}</strong> ${row.accion}</div>
+            <div style="font-size: 0.75rem; color: var(--text-muted);">${new Date(row.fecha).toLocaleString()}</div>
+        </div>
+    `).join('');
+}
+
+document.getElementById('btn-close-historial').addEventListener('click', () => {
+    document.getElementById('modal-historial').style.display = 'none';
 });
 
 // Remove unused SQLite Datalist features since Supabase handles lookup dynamically if needed.
