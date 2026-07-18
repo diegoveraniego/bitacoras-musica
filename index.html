@@ -189,13 +189,16 @@
             align-items: center;
             justify-content: center;
             z-index: 100;
-            opacity: 0;
-            transition: opacity 0.2s ease;
+            pointer-events: none;
+        }
+
+        .modal-overlay[style*="flex"] {
+            pointer-events: auto;
         }
 
         .modal-overlay.open {
             display: flex;
-            opacity: 1;
+            pointer-events: auto;
         }
 
         .modal-dialog {
@@ -1294,8 +1297,8 @@ function openEditForm(song, artistas, generos, instrumentos, inspiraciones) {
         paisesSet.forEach(p => addTagToUI('tags_paises', p, 'f_paises'));
     }
 
-    // Fetch history summary
-    document.getElementById('historial-resumen').innerText = 'Cargando historial...';
+    // Fetch history summary (optional - table may not exist yet)
+    document.getElementById('historial-resumen').innerText = '';
     document.getElementById('btn-historial').style.display = 'none';
     
     supabase.from('historial_cambios')
@@ -1303,14 +1306,14 @@ function openEditForm(song, artistas, generos, instrumentos, inspiraciones) {
         .eq('cancion_id', song.id)
         .order('fecha', { ascending: false })
         .limit(1)
-        .then(({ data }) => {
+        .then(({ data, error }) => {
+            if (error) return; // table may not exist yet, silently skip
             if (data && data.length > 0) {
                 const date = new Date(data[0].fecha).toLocaleDateString();
-                document.getElementById('historial-resumen').innerText = `Última edición por ${data[0].usuario} el ${date}`;
-                document.getElementById('btn-historial').style.display = 'inline-flex';
-                document.getElementById('btn-historial').onclick = () => openHistorial(song.id);
-            } else {
-                document.getElementById('historial-resumen').innerText = 'Sin historial registrado.';
+                const el = document.getElementById('historial-resumen');
+                if (el) el.innerText = `Última edición por ${data[0].usuario} el ${date}`;
+                const btn = document.getElementById('btn-historial');
+                if (btn) { btn.style.display = 'inline-flex'; btn.onclick = () => openHistorial(song.id); }
             }
         });
 
@@ -1523,7 +1526,7 @@ async function openHistorial(cancionId) {
         .order('fecha', { ascending: false });
         
     if (error) {
-        list.innerHTML = 'Error al cargar historial';
+        list.innerHTML = 'Historial no disponible aún. Ejecuta el SQL pendiente en Supabase.';
         return;
     }
     
