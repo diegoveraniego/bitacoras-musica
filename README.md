@@ -1,17 +1,43 @@
-# Bitácoras de Audición
+<div align="center">
+  <img src="logo.svg" alt="Bitácoras de Audición Logo" height="80" style="filter: invert(0);">
 
-Plataforma web colaborativa para que profesores de música en Chile gestionen, compartan y consulten "bitácoras de audición" para uso curricular. 
+  # Bitácoras de Audición
 
-## Enlace al Proyecto
-🔗 **[Ver la aplicación en vivo (GitHub Pages)](https://diegoveraniego.github.io/bitacoras-musica/)**
+  Plataforma web colaborativa para que profesores de música en Chile gestionen, compartan y consulten **bitácoras de audición** para uso curricular.
+
+  🔗 **[Ver la aplicación en vivo](https://diegoveraniego.github.io/bitacoras-musica/)**
+
+</div>
+
+---
 
 ## Características Principales
-- **Arquitectura Serverless:** Desarrollada como una Single Page Application (SPA) en Vanilla JS, sin necesidad de compilación (build steps).
-- **Base de Datos Colaborativa:** Utiliza **Supabase** (PostgreSQL) para almacenamiento en la nube, reemplazando la base de datos SQLite local anterior.
-- **Autenticación sin contraseñas:** Ingreso seguro mediante Magic Links enviados al correo (Supabase Auth).
-- **Gestión de Permisos (RLS):**
-  - Cualquier visitante puede navegar, filtrar y leer el catálogo de canciones aprobadas de forma pública.
-  - Los profesores autenticados pueden proponer nuevas canciones (que ingresan en estado "pendiente").
-  - Panel administrativo integrado para que usuarios logueados revisen los aportes recientes y aprueben las bitácoras pendientes.
-- **Detalle Analítico Musical:** Sistema robusto de categorización (métrica, tempo, instrumentos, idiomas, clasificaciones curriculares) e ingreso de estructuras y progresiones armónicas de las secciones tonales.
-- **Interfaz Fluida:** Estética inspirada en Adwaita/GNOME.
+
+- **Arquitectura Serverless** — Single Page Application en Vanilla JS, sin build steps.
+- **Base de Datos en la Nube** — [Supabase](https://supabase.com/) (PostgreSQL) para almacenamiento colaborativo.
+- **Acceso por clave** — Login simple con nombre de usuario y clave para editar y agregar bitácoras.
+- **Filtros avanzados** — Filtra el catálogo por género, instrumento, idioma, país y estado.
+- **Historial de Cambios** — Registro estilo Wikipedia de quién editó cada bitácora y cuándo.
+- **Covers cuadrados** — Visualización tipo Spotify de los álbumes.
+- **Detalle Musical** — Secciones tonales, BPM, métrica, progresiones armónicas, clasificación curricular.
+- **Panel de Actividad Reciente** — Revisión de bitácoras pendientes de aprobación.
+- **Interfaz Adwaita** — Estética inspirada en GNOME/Adwaita.
+
+## Uso
+
+| Usuario   | Contraseña | Rol       |
+|-----------|------------|-----------|
+| `diego`   | `1234`     | Editor    |
+| `gustavo` | `1234`     | Editor    |
+| `alvaro`  | `1234`     | Editor    |
+
+Los visitantes sin sesión pueden **navegar y filtrar** el catálogo libremente. Solo los usuarios autenticados pueden **crear y editar** bitácoras.
+
+## Stack Técnico
+
+| Capa       | Tecnología              |
+|------------|-------------------------|
+| Frontend   | HTML + Vanilla JS + CSS |
+| Base datos | Supabase (PostgreSQL)   |
+| Hosting    | GitHub Pages            |
+| Auth       | localStorage (testing)  |

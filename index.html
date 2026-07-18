@@ -86,6 +86,17 @@
             left: 50%;
             transform: translateX(-50%);
             pointer-events: none;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .header-logo {
+            height: 28px;
+            width: auto;
+            /* The SVG is black; invert to white for dark header */
+            filter: invert(1);
+            display: block;
         }
 
         .headerbar-controls {
@@ -547,7 +558,10 @@
                 Nueva Canción
             </button>
         </div>
-        <h1>Bitácoras</h1>
+        <h1>
+            <img src="logo.svg" alt="Bitácoras" class="header-logo">
+            Bitácoras
+        </h1>
         <div class="headerbar-controls">
             <div id="auth-controls" style="display:flex; gap:0.5rem; align-items:center;">
                 <!-- Rendered by JS -->
