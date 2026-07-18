@@ -566,6 +566,9 @@
             Bitácoras
         </h1>
         <div class="headerbar-controls">
+            <button class="button" id="btn-about" title="Acerca de" style="padding: 0.4rem; background: transparent; border-color: transparent;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+            </button>
             <div id="auth-controls" style="display:flex; gap:0.5rem; align-items:center;">
                 <!-- Rendered by JS -->
             </div>
@@ -588,6 +591,7 @@
                     <select class="filter-select" id="filter-genero"><option value="">Todos los géneros</option></select>
                     <select class="filter-select" id="filter-instrumento"><option value="">Todos los instrumentos</option></select>
                     <select class="filter-select" id="filter-idioma"><option value="">Todos los idiomas</option></select>
+                    <select class="filter-select" id="filter-metrica"><option value="">Todas las métricas</option></select>
                     <select class="filter-select" id="filter-pais"><option value="">Todos los países</option></select>
                     <select class="filter-select" id="filter-estado">
                         <option value="">Todos los estados</option>
@@ -814,6 +818,21 @@
         </div>
     </div>
 
+    <!-- MODAL: Acerca de -->
+    <div id="modal-about" class="modal-overlay">
+        <div class="modal-dialog" style="max-width: 600px;">
+            <div class="modal-header">
+                <h2>Acerca de Bitácoras de Audición</h2>
+                <button class="icon-button" id="btn-close-about">&times;</button>
+            </div>
+            <div class="modal-body" style="font-size: 1rem; line-height: 1.6; color: var(--text-color);">
+                <p><strong>Bitácoras de Audición</strong> es un catálogo colaborativo de Recursos Educativos Abiertos (REA) diseñado para profesores de música.</p>
+                <p>La problemática que busca solucionar es la falta de bases de datos enfocadas en la <strong>utilidad pedagógica</strong>. Mientras que existen gigantes como Spotify o MusicBrainz, estas no permiten a un docente buscar, por ejemplo, "canciones en métrica 7/4" o "canciones con una progresión I-V-vi-IV" para preparar sus clases.</p>
+                <p>Cualquier visitante puede navegar, filtrar y utilizar este catálogo de forma libre. Los usuarios registrados (profesores colaboradores) pueden aportar nuevas bitácoras, detallando la estructura tonal, el tempo, los instrumentos y la clasificación curricular de cada canción, nutriendo así a la comunidad de docentes de habla hispana.</p>
+            </div>
+        </div>
+    </div>
+
 <script type="module">
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
@@ -923,6 +942,10 @@ async function loadGrid(searchQuery = '') {
         query = query.eq('idioma', filters.idioma);
     }
     
+    if (filters.metrica) {
+        query = query.eq('metrica', filters.metrica);
+    }
+    
     const { data: cancionesRaw, error } = await query;
     loading.style.display = 'none';
     document.getElementById('app-content').style.display = 'block';
@@ -999,9 +1022,10 @@ async function populateFilters() {
         supabase.from('paises').select('nombre').order('nombre'),
     ]);
     
-    // Also get distinct idiomas from canciones
-    const { data: idiomaData } = await supabase.from('canciones').select('idioma').neq('idioma', null);
-    const idiomas = [...new Set((idiomaData || []).map(d => d.idioma).filter(Boolean))].sort();
+    // Also get distinct idiomas and metricas from canciones
+    const { data: cancionesDist } = await supabase.from('canciones').select('idioma, metrica');
+    const idiomas = [...new Set((cancionesDist || []).map(d => d.idioma).filter(Boolean))].sort();
+    const metricas = [...new Set((cancionesDist || []).map(d => d.metrica).filter(Boolean))].sort();
     
     const sel = (id, items) => {
         const el = document.getElementById(id);
@@ -1016,6 +1040,7 @@ async function populateFilters() {
     if (genRes.data) sel('filter-genero', genRes.data.map(g => g.nombre));
     if (instRes.data) sel('filter-instrumento', instRes.data.map(i => i.nombre));
     sel('filter-idioma', idiomas);
+    sel('filter-metrica', metricas);
     if (paisRes.data) sel('filter-pais', paisRes.data.map(p => p.nombre));
     
     // Also populate paises datalist in form
@@ -1035,7 +1060,7 @@ function updateClearBtn() {
     btn.style.display = active ? 'inline-block' : 'none';
 }
 
-['filter-genero', 'filter-instrumento', 'filter-idioma', 'filter-estado', 'filter-pais'].forEach(id => {
+['filter-genero', 'filter-instrumento', 'filter-idioma', 'filter-metrica', 'filter-estado', 'filter-pais'].forEach(id => {
     document.getElementById(id).addEventListener('change', (e) => {
         const key = id.replace('filter-', '');
         filters[key] = e.target.value;
@@ -1219,6 +1244,14 @@ document.getElementById('btn-close-modal').addEventListener('click', () => {
 });
 document.getElementById('btn-close-admin').addEventListener('click', () => {
     document.getElementById('modal-admin').style.display = 'none';
+});
+
+document.getElementById('btn-about').addEventListener('click', () => {
+    document.getElementById('modal-about').style.display = 'flex';
+});
+
+document.getElementById('btn-close-about').addEventListener('click', () => {
+    document.getElementById('modal-about').style.display = 'none';
 });
 document.getElementById('btn-nueva').addEventListener('click', () => {
     editingSongId = null;
