@@ -571,6 +571,7 @@
                     <select class="filter-select" id="filter-genero"><option value="">Todos los géneros</option></select>
                     <select class="filter-select" id="filter-instrumento"><option value="">Todos los instrumentos</option></select>
                     <select class="filter-select" id="filter-idioma"><option value="">Todos los idiomas</option></select>
+                    <select class="filter-select" id="filter-pais"><option value="">Todos los países</option></select>
                     <select class="filter-select" id="filter-estado">
                         <option value="">Todos los estados</option>
                         <option value="aprobado">Aprobado</option>
@@ -627,6 +628,13 @@
                         <input type="text" id="f_artistas" class="form-control tag-input" list="dl_artistas" data-target="tags_artistas">
                         <datalist id="dl_artistas"></datalist>
                         <div id="tags_artistas" class="tag-container"></div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="f_paises">País/Países del artista (Enter para agregar)</label>
+                        <input type="text" id="f_paises" class="form-control tag-input" list="dl_paises" data-target="tags_paises">
+                        <datalist id="dl_paises"></datalist>
+                        <div id="tags_paises" class="tag-container"></div>
                     </div>
 
                     <div class="form-group">
@@ -870,14 +878,17 @@ const extractNames = (arr, relationName, targetName) => {
 };
 
 // Filter state
-const filters = { genero: '', instrumento: '', idioma: '', estado: '' };
+const filters = { genero: '', instrumento: '', idioma: '', estado: '', pais: '' };
 
 async function loadGrid(searchQuery = '') {
     loading.style.display = 'flex';
     container.innerHTML = '';
     
     let query = supabase.from('canciones')
-        .select('id, titulo, portada_url, estado, idioma, cancion_artista(artista:artistas(nombre)), cancion_genero(genero:generos(nombre)), cancion_instrumento(instrumento:instrumentos(nombre))')
+        .select(`id, titulo, portada_url, estado, idioma,
+            cancion_artista(artista:artistas(id, nombre, artista_pais(pais:paises(nombre)))),
+            cancion_genero(genero:generos(nombre)),
+            cancion_instrumento(instrumento:instrumentos(nombre))`)
         .order('id', { ascending: false });
     
     if (!currentUser) {
@@ -914,6 +925,13 @@ async function loadGrid(searchQuery = '') {
     if (filters.instrumento) {
         canciones = canciones.filter(s =>
             s.cancion_instrumento && s.cancion_instrumento.some(i => i.instrumento?.nombre === filters.instrumento)
+        );
+    }
+    if (filters.pais) {
+        canciones = canciones.filter(s =>
+            s.cancion_artista && s.cancion_artista.some(ca =>
+                ca.artista?.artista_pais && ca.artista.artista_pais.some(ap => ap.pais?.nombre === filters.pais)
+            )
         );
     }
     
@@ -958,9 +976,10 @@ document.getElementById('search-input').addEventListener('input', (e) => {
 
 // Populate filter dropdowns from DB
 async function populateFilters() {
-    const [genRes, instRes] = await Promise.all([
+    const [genRes, instRes, paisRes] = await Promise.all([
         supabase.from('generos').select('nombre').order('nombre'),
         supabase.from('instrumentos').select('nombre').order('nombre'),
+        supabase.from('paises').select('nombre').order('nombre'),
     ]);
     
     // Also get distinct idiomas from canciones
@@ -980,6 +999,17 @@ async function populateFilters() {
     if (genRes.data) sel('filter-genero', genRes.data.map(g => g.nombre));
     if (instRes.data) sel('filter-instrumento', instRes.data.map(i => i.nombre));
     sel('filter-idioma', idiomas);
+    if (paisRes.data) sel('filter-pais', paisRes.data.map(p => p.nombre));
+    
+    // Also populate paises datalist in form
+    if (paisRes.data) {
+        const dl = document.getElementById('dl_paises');
+        if (dl) paisRes.data.forEach(p => {
+            const opt = document.createElement('option');
+            opt.value = p.nombre;
+            dl.appendChild(opt);
+        });
+    }
 }
 
 function updateClearBtn() {
@@ -988,7 +1018,7 @@ function updateClearBtn() {
     btn.style.display = active ? 'inline-block' : 'none';
 }
 
-['filter-genero', 'filter-instrumento', 'filter-idioma', 'filter-estado'].forEach(id => {
+['filter-genero', 'filter-instrumento', 'filter-idioma', 'filter-estado', 'filter-pais'].forEach(id => {
     document.getElementById(id).addEventListener('change', (e) => {
         const key = id.replace('filter-', '');
         filters[key] = e.target.value;
@@ -998,7 +1028,7 @@ function updateClearBtn() {
 });
 
 document.getElementById('btn-clear-filters').addEventListener('click', () => {
-    filters.genero = ''; filters.instrumento = ''; filters.idioma = ''; filters.estado = '';
+    filters.genero = ''; filters.instrumento = ''; filters.idioma = ''; filters.estado = ''; filters.pais = '';
     document.querySelectorAll('.filter-select').forEach(s => s.value = '');
     updateClearBtn();
     loadGrid('');
@@ -1236,6 +1266,20 @@ function openEditForm(song, artistas, generos, instrumentos, inspiraciones) {
     document.getElementById('tags_inspiraciones').innerHTML = '';
     if(inspiraciones) inspiraciones.split(', ').forEach(t => t && addTagToUI('tags_inspiraciones', t, 'f_inspiraciones'));
 
+    // populate países from artistas linked to this song
+    document.getElementById('tags_paises').innerHTML = '';
+    if (song.cancion_artista) {
+        const paisesSet = new Set();
+        song.cancion_artista.forEach(ca => {
+            if (ca.artista?.artista_pais) {
+                ca.artista.artista_pais.forEach(ap => {
+                    if (ap.pais?.nombre) paisesSet.add(ap.pais.nombre);
+                });
+            }
+        });
+        paisesSet.forEach(p => addTagToUI('tags_paises', p, 'f_paises'));
+    }
+
     // Fetch history summary
     document.getElementById('historial-resumen').innerText = 'Cargando historial...';
     document.getElementById('btn-historial').style.display = 'none';
@@ -1349,6 +1393,37 @@ async function saveTags(songId, containerId, tableName, linkTableName, linkColNa
     }
 }
 
+// Save países linked to artistas of this song
+async function savePaises(songId) {
+    const paisNames = Array.from(document.getElementById('tags_paises').children).map(c => c.dataset.val);
+    
+    // Get artista IDs for this song
+    const { data: cancionArtistas } = await supabase.from('cancion_artista').select('artista_id').eq('cancion_id', songId);
+    if (!cancionArtistas || cancionArtistas.length === 0) return;
+    const artistaIds = cancionArtistas.map(ca => ca.artista_id);
+    
+    // Clear existing paises for those artistas
+    for (const artistaId of artistaIds) {
+        await supabase.from('artista_pais').delete().eq('artista_id', artistaId);
+    }
+    
+    // Upsert each pais and link to each artista
+    for (const name of paisNames) {
+        let { data: existing } = await supabase.from('paises').select('id').eq('nombre', name).maybeSingle();
+        let paisId;
+        if (existing) {
+            paisId = existing.id;
+        } else {
+            const { data: inserted, error } = await supabase.from('paises').insert({ nombre: name }).select('id').single();
+            if (error) { console.error(error); continue; }
+            paisId = inserted.id;
+        }
+        for (const artistaId of artistaIds) {
+            await supabase.from('artista_pais').upsert({ artista_id: artistaId, pais_id: paisId });
+        }
+    }
+}
+
 document.getElementById('btn-save-cancion').addEventListener('click', async (e) => {
     e.preventDefault();
     if (!currentUser) return alert('Debes iniciar sesión para guardar');
@@ -1390,6 +1465,7 @@ document.getElementById('btn-save-cancion').addEventListener('click', async (e) 
     await saveTags(savedSongId, 'tags_generos', 'generos', 'cancion_genero', 'genero_id');
     await saveTags(savedSongId, 'tags_instrumentos', 'instrumentos', 'cancion_instrumento', 'instrumento_id');
     await saveTags(savedSongId, 'tags_inspiraciones', 'inspiraciones', 'cancion_inspiracion', 'inspiracion_id');
+    await savePaises(savedSongId);
 
     // Save sections
     await supabase.from('secciones_tonales').delete().eq('cancion_id', savedSongId);
