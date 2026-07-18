@@ -1088,8 +1088,8 @@ async function openDetailView(id) {
         coverHtml = `<img src="${song.portada_url}" class="detail-cover">`;
     }
 
-    let youtubeHtml = song.youtube_url 
-        ? `<a href="${song.youtube_url}" target="_blank" class="button" style="display:inline-flex; align-items:center; gap:0.5rem; background:#ff0000; color:white; border:none; margin-top:1rem;">
+    let youtubeHtml = song.enlace 
+        ? `<a href="${song.enlace}" target="_blank" class="button" style="display:inline-flex; align-items:center; gap:0.5rem; background:#ff0000; color:white; border:none; margin-top:1rem;">
             Ver en YouTube
            </a>` : '';
            
@@ -1185,7 +1185,7 @@ async function openDetailView(id) {
 
 function copyInfoToClipboard(song, artistas, generos, instrumentos, inspiraciones) {
     let text = `🎵 ${song.titulo} - ${artistas}\n`;
-    if (song.youtube_url) text += `🎥 YouTube: ${song.youtube_url}\n`;
+    if (song.enlace) text += `🎥 YouTube: ${song.enlace}\n`;
     text += `\n📊 Info:\n`;
     text += `- Géneros: ${generos || '-'}\n`;
     text += `- Instrumentos: ${instrumentos || '-'}\n`;
@@ -1268,7 +1268,7 @@ function openEditForm(song, artistas, generos, instrumentos, inspiraciones) {
     document.getElementById('f_bpm').value = song.tempo_bpm || '';
     document.getElementById('f_idioma').value = song.idioma || '';
     document.getElementById('f_portada').value = song.portada_url || '';
-    document.getElementById('f_youtube').value = song.youtube_url || '';
+    document.getElementById('f_youtube').value = song.enlace || '';
     document.getElementById('f_clasificacion').value = song.clasificacion_contenido || '';
     document.getElementById('f_clasif_detalle').value = song.clasificacion_detalle || '';
     document.getElementById('f_notas').value = song.notas || '';
@@ -1455,7 +1455,7 @@ document.getElementById('btn-save-cancion').addEventListener('click', async (e) 
         tempo_bpm: document.getElementById('f_bpm').value ? parseInt(document.getElementById('f_bpm').value) : null,
         idioma: document.getElementById('f_idioma').value.trim() || null,
         portada_url: document.getElementById('f_portada').value.trim() || null,
-        youtube_url: document.getElementById('f_youtube').value.trim() || null,
+        enlace: document.getElementById('f_youtube').value.trim() || null,
         clasificacion_contenido: document.getElementById('f_clasificacion').value || null,
         clasificacion_detalle: document.getElementById('f_clasif_detalle').value.trim() || null,
         notas: document.getElementById('f_notas').value.trim() || null
