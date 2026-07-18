@@ -730,41 +730,47 @@ const btnNueva = document.getElementById('btn-nueva');
 
 // Auth
 async function initAuth() {
-    const { data: { session } } = await supabase.auth.getSession();
-    currentUser = session?.user || null;
-    
-    supabase.auth.onAuthStateChange((_event, session) => {
-        currentUser = session?.user || null;
-        renderAuthUI();
-        loadGrid();
-    });
-    
+    currentUser = JSON.parse(localStorage.getItem('fakeUser') || 'null');
     renderAuthUI();
+    loadGrid();
 }
 
 function renderAuthUI() {
     if (currentUser) {
         authControls.innerHTML = `
-            <span style="font-size: 0.9rem; color: var(--text-muted);">${currentUser.email}</span>
-            <button class="button" id="btn-logout">Cerrar Sesión</button>
+            <span style="font-size: 0.9rem; color: var(--text-muted); font-weight: 500;">Hola, ${currentUser.email}</span>
+            <button class="button" id="btn-logout">Salir</button>
         `;
-        document.getElementById('btn-logout').addEventListener('click', () => supabase.auth.signOut());
+        document.getElementById('btn-logout').addEventListener('click', () => {
+            localStorage.removeItem('fakeUser');
+            currentUser = null;
+            renderAuthUI();
+            loadGrid();
+        });
         btnAdmin.style.display = 'inline-flex';
         btnNueva.style.display = 'inline-flex';
     } else {
         authControls.innerHTML = `
             <div style="display: flex; gap: 0.25rem;">
-                <input type="email" id="login-email" class="form-control" placeholder="Correo" style="width: 140px; padding: 0.2rem 0.5rem; min-height: 30px;">
-                <input type="password" id="login-pass" class="form-control" placeholder="Contraseña" style="width: 120px; padding: 0.2rem 0.5rem; min-height: 30px;">
+                <input type="text" id="login-email" class="form-control" placeholder="Nombre" style="width: 90px; padding: 0.2rem 0.5rem; min-height: 30px;">
+                <input type="password" id="login-pass" class="form-control" placeholder="Clave" style="width: 70px; padding: 0.2rem 0.5rem; min-height: 30px;">
                 <button class="button" id="btn-login-pass" style="min-height: 30px;">Entrar</button>
             </div>
         `;
-        document.getElementById('btn-login-pass').addEventListener('click', async () => {
-            const email = document.getElementById('login-email').value;
+        document.getElementById('btn-login-pass').addEventListener('click', () => {
+            const nombre = document.getElementById('login-email').value.toLowerCase().trim();
             const password = document.getElementById('login-pass').value;
-            if (!email || !password) return alert('Ingresa correo y contraseña');
-            const { error } = await supabase.auth.signInWithPassword({ email, password });
-            if (error) alert('Error: ' + error.message);
+            if (!nombre || !password) return alert('Ingresa nombre y clave');
+            
+            const validUsers = ['diego', 'gustavo', 'alvaro'];
+            if (validUsers.includes(nombre) && password === '1234') {
+                currentUser = { id: nombre, email: nombre.charAt(0).toUpperCase() + nombre.slice(1) };
+                localStorage.setItem('fakeUser', JSON.stringify(currentUser));
+                renderAuthUI();
+                loadGrid();
+            } else {
+                alert('Nombre o clave incorrectos');
+            }
         });
         btnAdmin.style.display = 'none';
         btnNueva.style.display = 'none';
@@ -956,7 +962,7 @@ async function openDetailView(id) {
         if (btnAprobar) {
             btnAprobar.addEventListener('click', async () => {
                 const { error } = await supabase.from('canciones')
-                    .update({ estado: 'aprobado', modificado_por: currentUser.id, modificado_en: new Date().toISOString() })
+                    .update({ estado: 'aprobado', modificado_por: null, modificado_en: new Date().toISOString() })
                     .eq('id', id);
                 if (!error) {
                     alert('Aprobada');
@@ -1185,14 +1191,12 @@ document.getElementById('btn-save-cancion').addEventListener('click', async (e) 
 
     if (editingSongId) {
         // Update
-        songData.modificado_por = currentUser.id;
         songData.modificado_en = new Date().toISOString();
         const { error } = await supabase.from('canciones').update(songData).eq('id', editingSongId);
         if (error) return alert('Error al actualizar: ' + error.message);
         savedSongId = editingSongId;
     } else {
         // Insert
-        songData.creado_por = currentUser.id;
         songData.estado = 'pendiente';
         const { data, error } = await supabase.from('canciones').insert(songData).select('id').single();
         if (error) return alert('Error al crear: ' + error.message);
