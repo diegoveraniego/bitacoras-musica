@@ -351,9 +351,55 @@
             width: 100%;
             max-width: 1200px;
             display: flex;
-            gap: 1rem;
+            flex-direction: column;
+            gap: 0.75rem;
             margin-bottom: 1.5rem;
+        }
+
+        .toolbar-row {
+            display: flex;
+            gap: 0.75rem;
             align-items: center;
+            width: 100%;
+            flex-wrap: wrap;
+        }
+
+        .filter-select {
+            padding: 0.5rem 0.9rem;
+            border-radius: 20px;
+            border: 1px solid var(--border-color);
+            background-color: var(--card-bg);
+            color: var(--text-color);
+            font-size: 0.85rem;
+            font-family: inherit;
+            cursor: pointer;
+            appearance: none;
+            -webkit-appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23888'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 0.8rem center;
+            padding-right: 2rem;
+        }
+
+        .filter-select:focus {
+            outline: none;
+            border-color: var(--accent-color);
+        }
+
+        #btn-clear-filters {
+            display: none;
+            font-size: 0.8rem;
+            color: var(--accent-color);
+            cursor: pointer;
+            background: none;
+            border: none;
+            font-family: inherit;
+            padding: 0.3rem 0.5rem;
+            border-radius: 8px;
+        }
+
+        #btn-clear-filters:hover {
+            text-decoration: underline;
         }
 
         .search-input {
@@ -518,7 +564,20 @@
 
         <div id="app-content">
             <div class="toolbar">
-                <input type="text" class="search-input" id="search-input" placeholder="Buscar canción, artista…">
+                <div class="toolbar-row">
+                    <input type="text" class="search-input" id="search-input" placeholder="Buscar canción, artista…">
+                </div>
+                <div class="toolbar-row">
+                    <select class="filter-select" id="filter-genero"><option value="">Todos los géneros</option></select>
+                    <select class="filter-select" id="filter-instrumento"><option value="">Todos los instrumentos</option></select>
+                    <select class="filter-select" id="filter-idioma"><option value="">Todos los idiomas</option></select>
+                    <select class="filter-select" id="filter-estado">
+                        <option value="">Todos los estados</option>
+                        <option value="aprobado">Aprobado</option>
+                        <option value="pendiente">Pendiente</option>
+                    </select>
+                    <button id="btn-clear-filters">✕ Limpiar filtros</button>
+                </div>
             </div>
             <div class="grid-container" id="grid-container">
                 <!-- Cards go here -->
@@ -810,29 +869,52 @@ const extractNames = (arr, relationName, targetName) => {
     return arr.map(item => item[targetName]?.nombre).filter(n => n);
 };
 
+// Filter state
+const filters = { genero: '', instrumento: '', idioma: '', estado: '' };
+
 async function loadGrid(searchQuery = '') {
     loading.style.display = 'flex';
     container.innerHTML = '';
     
     let query = supabase.from('canciones')
-        .select('id, titulo, portada_url, estado, cancion_artista(artista:artistas(nombre))')
+        .select('id, titulo, portada_url, estado, idioma, cancion_artista(artista:artistas(nombre)), cancion_genero(genero:generos(nombre)), cancion_instrumento(instrumento:instrumentos(nombre))')
         .order('id', { ascending: false });
     
     if (!currentUser) {
+        // If logged out, override estado filter to only show aprobado
         query = query.eq('estado', 'aprobado');
+    } else if (filters.estado) {
+        query = query.eq('estado', filters.estado);
     }
     
     if (searchQuery) {
         query = query.ilike('titulo', `%${searchQuery}%`);
     }
     
-    const { data: canciones, error } = await query;
+    if (filters.idioma) {
+        query = query.eq('idioma', filters.idioma);
+    }
+    
+    const { data: cancionesRaw, error } = await query;
     loading.style.display = 'none';
     document.getElementById('app-content').style.display = 'block';
     
     if (error) {
         container.innerHTML = '<p>Error al cargar canciones.</p>';
         return;
+    }
+
+    // Client-side filter by genero/instrumento (joins needed)
+    let canciones = cancionesRaw;
+    if (filters.genero) {
+        canciones = canciones.filter(s =>
+            s.cancion_genero && s.cancion_genero.some(g => g.genero?.nombre === filters.genero)
+        );
+    }
+    if (filters.instrumento) {
+        canciones = canciones.filter(s =>
+            s.cancion_instrumento && s.cancion_instrumento.some(i => i.instrumento?.nombre === filters.instrumento)
+        );
     }
     
     canciones.forEach(song => {
@@ -841,9 +923,9 @@ async function loadGrid(searchQuery = '') {
         card.className = 'card';
         card.dataset.id = song.id;
         
-        let imgHtml = '<div class="card-img-placeholder">🎵</div>';
+        let imgHtml = '<div class="card-cover-placeholder">🎵</div>';
         if (song.portada_url) {
-            imgHtml = `<img src="${song.portada_url}" class="card-img" loading="lazy" alt="Portada">`;
+            imgHtml = `<img src="${song.portada_url}" class="card-cover" loading="lazy" alt="Portada">`;
         }
         
         let pendingBadge = '';
@@ -856,7 +938,7 @@ async function loadGrid(searchQuery = '') {
                 ${imgHtml}
                 ${pendingBadge}
             </div>
-            <div class="card-content">
+            <div class="card-info">
                 <div class="card-title">${song.titulo}</div>
                 <div class="card-artist">${artistas.join(', ') || 'Desconocido'}</div>
             </div>
@@ -873,6 +955,56 @@ document.getElementById('search-input').addEventListener('input', (e) => {
     clearTimeout(searchTimeout);
     searchTimeout = setTimeout(() => loadGrid(e.target.value.trim()), 300);
 });
+
+// Populate filter dropdowns from DB
+async function populateFilters() {
+    const [genRes, instRes] = await Promise.all([
+        supabase.from('generos').select('nombre').order('nombre'),
+        supabase.from('instrumentos').select('nombre').order('nombre'),
+    ]);
+    
+    // Also get distinct idiomas from canciones
+    const { data: idiomaData } = await supabase.from('canciones').select('idioma').neq('idioma', null);
+    const idiomas = [...new Set((idiomaData || []).map(d => d.idioma).filter(Boolean))].sort();
+    
+    const sel = (id, items) => {
+        const el = document.getElementById(id);
+        items.forEach(name => {
+            const opt = document.createElement('option');
+            opt.value = name;
+            opt.textContent = name;
+            el.appendChild(opt);
+        });
+    };
+    
+    if (genRes.data) sel('filter-genero', genRes.data.map(g => g.nombre));
+    if (instRes.data) sel('filter-instrumento', instRes.data.map(i => i.nombre));
+    sel('filter-idioma', idiomas);
+}
+
+function updateClearBtn() {
+    const btn = document.getElementById('btn-clear-filters');
+    const active = Object.values(filters).some(v => v !== '');
+    btn.style.display = active ? 'inline-block' : 'none';
+}
+
+['filter-genero', 'filter-instrumento', 'filter-idioma', 'filter-estado'].forEach(id => {
+    document.getElementById(id).addEventListener('change', (e) => {
+        const key = id.replace('filter-', '');
+        filters[key] = e.target.value;
+        updateClearBtn();
+        loadGrid(document.getElementById('search-input').value.trim());
+    });
+});
+
+document.getElementById('btn-clear-filters').addEventListener('click', () => {
+    filters.genero = ''; filters.instrumento = ''; filters.idioma = ''; filters.estado = '';
+    document.querySelectorAll('.filter-select').forEach(s => s.value = '');
+    updateClearBtn();
+    loadGrid('');
+});
+
+populateFilters();
 
 // Detail View
 async function openDetailView(id) {
