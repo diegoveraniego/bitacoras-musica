@@ -828,6 +828,7 @@ async function loadGrid(searchQuery = '') {
     
     const { data: canciones, error } = await query;
     loading.style.display = 'none';
+    document.getElementById('app-content').style.display = 'block';
     
     if (error) {
         container.innerHTML = '<p>Error al cargar canciones.</p>';
